@@ -1,16 +1,137 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState, useCallback } from "react";
+import { createInitialState, runTrainingRound, FLState } from "@/lib/federated-learning";
+import { AgentStatusPanel } from "@/components/AgentStatusPanel";
+import { ClientCards } from "@/components/ClientCards";
+import { TrainingChart } from "@/components/TrainingChart";
+import { TrainingLog } from "@/components/TrainingLog";
+import { ModelVersions } from "@/components/ModelVersions";
+import { StatsBar } from "@/components/StatsBar";
+import { Button } from "@/components/ui/button";
+import { Play, RotateCcw, Zap } from "lucide-react";
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const Index = () => {
+  const [state, setState] = useState<FLState>(() => createInitialState(10));
+  const [isRunning, setIsRunning] = useState(false);
+
+  const runOneRound = useCallback(async () => {
+    if (state.currentRound >= state.totalRounds) return;
+    setIsRunning(true);
+
+    const { newState } = await runTrainingRound(state, (phase, clients) => {
+      setState((prev) => ({
+        ...prev,
+        phase,
+        isTraining: true,
+        ...(clients ? { clients } : {}),
+      }));
+    });
+
+    setState({ ...newState, phase: newState.currentRound >= newState.totalRounds ? "complete" : "idle", isTraining: false });
+    setIsRunning(false);
+  }, [state]);
+
+  const runAll = useCallback(async () => {
+    let current = state;
+    setIsRunning(true);
+
+    while (current.currentRound < current.totalRounds) {
+      const { newState } = await runTrainingRound(current, (phase, clients) => {
+        setState((prev) => ({
+          ...prev,
+          phase,
+          isTraining: true,
+          ...(clients ? { clients } : {}),
+        }));
+      });
+      current = { ...newState, phase: newState.currentRound >= newState.totalRounds ? "complete" : "idle", isTraining: false };
+      setState(current);
+    }
+
+    setIsRunning(false);
+  }, [state]);
+
+  const reset = () => {
+    setState(createInitialState(10));
+    setIsRunning(false);
+  };
+
+  const isDone = state.currentRound >= state.totalRounds;
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+        <div className="container max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+              <Zap className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-foreground">FLaaS</h1>
+              <p className="text-[11px] text-muted-foreground">Federated Learning as a Service</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={runOneRound}
+              disabled={isRunning || isDone}
+              size="sm"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5"
+            >
+              <Play className="w-3.5 h-3.5" />
+              Next Round
+            </Button>
+            <Button
+              onClick={runAll}
+              disabled={isRunning || isDone}
+              size="sm"
+              variant="outline"
+              className="border-primary/30 text-primary hover:bg-primary/10 gap-1.5"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              Run All
+            </Button>
+            <Button onClick={reset} size="sm" variant="ghost" className="text-muted-foreground hover:text-foreground gap-1.5">
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Content */}
+      <main className="container max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* Phase indicator */}
+        {state.phase !== "idle" && state.phase !== "complete" && (
+          <div className="text-center">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-mono">
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              {state.phase.replace("_", " ").toUpperCase()}
+            </span>
+          </div>
+        )}
+
+        {isDone && (
+          <div className="text-center">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-mono">
+              ✓ TRAINING COMPLETE
+            </span>
+          </div>
+        )}
+
+        <StatsBar state={state} />
+        <AgentStatusPanel state={state} />
+        <ClientCards clients={state.clients} />
+        <TrainingChart rounds={state.rounds} />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TrainingLog rounds={state.rounds} phase={state.phase} />
+          <ModelVersions rounds={state.rounds} />
+        </div>
+      </main>
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;
