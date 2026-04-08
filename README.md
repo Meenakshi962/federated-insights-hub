@@ -1,6 +1,4 @@
-# Welcome to your Lovable project
 
-TODO: Document your project here
 An Agentic AI-powered, privacy-preserving platform for collaborative machine learning without sharing raw data.
 📌 Overview
 Federated Learning as a Service (FLaaS) is a cloud-native platform that enables multiple data owners (e.g., hospitals, organizations) to collaboratively train a shared machine learning model while keeping their data private.
